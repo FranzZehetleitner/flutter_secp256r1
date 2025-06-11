@@ -10,8 +10,8 @@ import 'p256_platform_interface.dart';
 class SecureP256 {
   const SecureP256._();
 
-  static Future<P256PublicKey> getPublicKey(
-      String tag, SecurityLevel securityLevel) async {
+  static Future<P256PublicKey> getPublicKey(String tag,
+      [SecurityLevel? securityLevel]) async {
     assert(tag.isNotEmpty);
     final raw =
         await SecureP256Platform.instance.getPublicKey(tag, securityLevel);
