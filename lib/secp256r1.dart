@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:agent_dart/agent_dart.dart';
+import 'package:secp256r1/src/constants.dart';
 import 'package:tuple/tuple.dart';
 
 import 'p256_platform_interface.dart';
@@ -9,9 +10,11 @@ import 'p256_platform_interface.dart';
 class SecureP256 {
   const SecureP256._();
 
-  static Future<P256PublicKey> getPublicKey(String tag) async {
+  static Future<P256PublicKey> getPublicKey(
+      String tag, SecurityLevel securityLevel) async {
     assert(tag.isNotEmpty);
-    final raw = await SecureP256Platform.instance.getPublicKey(tag);
+    final raw =
+        await SecureP256Platform.instance.getPublicKey(tag, securityLevel);
     // ECDSA starts with 0x04 and 65 length.
     if (raw.lengthInBytes == 65) {
       return P256PublicKey.fromRaw(raw);
@@ -60,6 +63,26 @@ class SecureP256 {
       rawKey = bytesWrapDer(rawKey, oidP256);
     }
     return SecureP256Platform.instance.getSharedSecret(tag, rawKey);
+  }
+
+  static Future<Uint8List> encryptData(
+      {required String tag, required Uint8List plaintext}) async {
+    assert(plaintext.isNotEmpty);
+    assert(tag.isNotEmpty);
+    return SecureP256Platform.instance.encryptData(
+      tag,
+      plaintext,
+    );
+  }
+
+  static Future<Uint8List> decryptData(
+      {required String tag, required Uint8List ciphertext}) async {
+    assert(ciphertext.isNotEmpty);
+    assert(tag.isNotEmpty);
+    return SecureP256Platform.instance.decryptData(
+      tag,
+      ciphertext,
+    );
   }
 
   /// Return [iv, cipher].

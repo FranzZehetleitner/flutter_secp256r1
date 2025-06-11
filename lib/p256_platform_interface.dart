@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:secp256r1/src/constants.dart';
 
 import 'p256_method_channel.dart';
 
@@ -25,8 +26,8 @@ abstract class SecureP256Platform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<Uint8List> getPublicKey(String tag) {
-    return _instance.getPublicKey(tag);
+  Future<Uint8List> getPublicKey(String tag, SecurityLevel securityLevel) {
+    return _instance.getPublicKey(tag, securityLevel);
   }
 
   Future<Uint8List> sign(String tag, Uint8List payload) {
@@ -43,5 +44,13 @@ abstract class SecureP256Platform extends PlatformInterface {
 
   Future<Uint8List> getSharedSecret(String tag, Uint8List publicKey) {
     return _instance.getSharedSecret(tag, publicKey);
+  }
+
+  Future<Uint8List> encryptData(String tag, Uint8List plaintext) {
+    return _instance.encryptData(tag, plaintext);
+  }
+
+  Future<Uint8List> decryptData(String tag, Uint8List ciphertext) {
+    return _instance.decryptData(tag, ciphertext);
   }
 }

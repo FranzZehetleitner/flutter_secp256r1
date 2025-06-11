@@ -8,13 +8,14 @@ import 'src/constants.dart';
 class SecureP256Channel extends SecureP256Platform {
   /// The method channel used to interact with the native platform.
   @visibleForTesting
-  final methodChannel = const MethodChannel('astrox_secure_p256_plugin');
+  final methodChannel = const MethodChannel('insight42_secure_p256_plugin');
 
   @override
-  Future<Uint8List> getPublicKey(String tag) async {
+  Future<Uint8List> getPublicKey(
+      String tag, SecurityLevel securityLevel) async {
     final keyBytes = await methodChannel.invokeMethod(
       Methods.getPublicKey,
-      {'tag': tag},
+      {'tag': tag, 'securityLevel': securityLevel.name},
     );
     return keyBytes;
   }
@@ -50,6 +51,24 @@ class SecureP256Channel extends SecureP256Platform {
     final result = await methodChannel.invokeMethod(
       Methods.getSharedSecret,
       {'tag': tag, 'publicKey': publicKey},
+    );
+    return result;
+  }
+
+  @override
+  Future<Uint8List> encryptData(String tag, Uint8List plaintext) async {
+    final result = await methodChannel.invokeMethod(
+      Methods.encryptData,
+      {'tag': tag, 'plaintext': plaintext},
+    );
+    return result;
+  }
+
+  @override
+  Future<Uint8List> decryptData(String tag, Uint8List ciphertext) async {
+    final result = await methodChannel.invokeMethod(
+      Methods.decryptData,
+      {'tag': tag, 'ciphertext': ciphertext},
     );
     return result;
   }

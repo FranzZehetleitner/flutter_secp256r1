@@ -1,41 +1,46 @@
-import Foundation
 import Flutter
+import Foundation
 import LocalAuthentication
 import UIKit
 
 public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "astrox_secure_p256_plugin", binaryMessenger: registrar.messenger())
+        let channel = FlutterMethodChannel(
+            name: "insight42_secure_p256_plugin", binaryMessenger: registrar.messenger())
         let instance = SwiftSecureP256Plugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
-    
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "getPublicKey":
             do {
-                let param = call.arguments as? Dictionary<String, Any>
+                let param = call.arguments as? [String: Any]
                 let tag = param!["tag"] as! String
-                var password : String? = nil
+                let level = (param!["securityLevel"] as? String) ?? "secure"
+                var password: String? = nil
                 if let pwd = param!["password"] as? String {
                     password = pwd
                 }
-                
-                let key = try getPublicKey(tag: tag, password: password)!
+
+                let key = try getPublicKey(tag: tag, password: password, level: level)!
                 result(FlutterStandardTypedData(bytes: key))
             } catch {
-                result(FlutterError(code: "getPublicKey", message: error.localizedDescription, details: "\(error)"))
+                result(
+                    FlutterError(
+                        code: "getPublicKey", message: error.localizedDescription,
+                        details: "\(error)"))
             }
         case "sign":
             do {
-                let param = call.arguments as? Dictionary<String, Any>
+                let param = call.arguments as? [String: Any]
                 let tag = param!["tag"] as! String
                 let payload = (param!["payload"] as! FlutterStandardTypedData).data
-                var password : String? = nil
+                var password: String? = nil
                 if let pwd = param!["password"] as? String {
                     password = pwd
                 }
-                
+
                 let signature = try sign(
                     tag: tag,
                     password: password,
@@ -43,11 +48,13 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 )!
                 result(FlutterStandardTypedData(bytes: signature))
             } catch {
-                result(FlutterError(code: "sign", message: error.localizedDescription, details: "\(error)"))
+                result(
+                    FlutterError(
+                        code: "sign", message: error.localizedDescription, details: "\(error)"))
             }
         case "verify":
             do {
-                let param = call.arguments as? Dictionary<String, Any>
+                let param = call.arguments as? [String: Any]
                 let payload = (param!["payload"] as! FlutterStandardTypedData).data
                 let publicKey = (param!["publicKey"] as! FlutterStandardTypedData).data
                 let signature = (param!["signature"] as! FlutterStandardTypedData).data
@@ -56,35 +63,73 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                     publicKey: publicKey,
                     signature: signature
                 )
-                
+
                 result(verified)
             } catch {
-                result(FlutterError(code: "verify", message: error.localizedDescription, details: "\(error)"))
+                result(
+                    FlutterError(
+                        code: "verify", message: error.localizedDescription, details: "\(error)"))
             }
         case "getSharedSecret":
             do {
-                let param = call.arguments as? Dictionary<String, Any>
+                let param = call.arguments as? [String: Any]
                 let tag = param!["tag"] as! String
                 let publicKeyData = (param!["publicKey"] as! FlutterStandardTypedData).data
-                var password : String? = nil
+                var password: String? = nil
                 if let pwd = param!["password"] as? String {
                     password = pwd
                 }
-                
-                let sharedSecret = try getSharedSecret(tag: tag, password: password, publicKeyData: publicKeyData)!
+
+                let sharedSecret = try getSharedSecret(
+                    tag: tag, password: password, publicKeyData: publicKeyData)!
                 result(FlutterStandardTypedData(bytes: sharedSecret))
             } catch {
-                result(FlutterError(code: "getSharedSecret", message: error.localizedDescription, details: "\(error)"))
+                result(
+                    FlutterError(
+                        code: "getSharedSecret", message: error.localizedDescription,
+                        details: "\(error)"))
+            }
+        case "encryptData":
+            do {
+                let param = call.arguments as? [String: Any]
+                let tag = param!["tag"] as! String
+                let plaintext = (param!["plaintext"] as! FlutterStandardTypedData).data
+
+                let ciphertext = try encryptDataECIES(tag: tag, plaintext: plaintext)
+                result(FlutterStandardTypedData(bytes: ciphertext))
+            } catch {
+                result(
+                    FlutterError(
+                        code: "encryptData", message: error.localizedDescription,
+                        details: "\(error)"))
+            }
+        case "decryptData":
+            do {
+                let param = call.arguments as? [String: Any]
+                let tag = param!["tag"] as! String
+                let ciphertext = (param!["ciphertext"] as! FlutterStandardTypedData).data
+
+                let plaintext = try decryptDataECIES(tag: tag, ciphertext: ciphertext)
+                result(FlutterStandardTypedData(bytes: plaintext))
+            } catch {
+                result(
+                    FlutterError(
+                        code: "decryptData", message: error.localizedDescription,
+                        details: "\(error)"))
+
             }
         default:
             result(FlutterMethodNotImplemented)
         }
     }
-    
-    func generateKeyPair(tag: String, password: String?) throws -> SecKey {
+
+    func generateKeyPair(tag: String, password: String?, level: String) throws -> SecKey {
         let tagData = tag.data(using: .utf8)
         let flags: SecAccessControlCreateFlags = [.privateKeyUsage]
         var accessError: Unmanaged<CFError>?
+        if level == "high" {
+            flags.insert(.userPresence)
+        }
         let accessControl = SecAccessControlCreateWithFlags(
             kCFAllocatorDefault,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
@@ -94,71 +139,74 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         if let error = accessError {
             throw error.takeRetainedValue() as Error
         }
-        
-        let parameter : CFDictionary
-        var parameterTemp: Dictionary<String, Any>
-        
+
+        let parameter: CFDictionary
+        var parameterTemp: [String: Any]
+
         if let tagData = tagData {
             parameterTemp = [
-                kSecAttrKeyType as String           : kSecAttrKeyTypeECSECPrimeRandom,
-                kSecAttrKeySizeInBits as String     : 256,
-                kSecPrivateKeyAttrs as String       : [
-                    kSecAttrIsPermanent as String       : true,
-                    kSecAttrApplicationTag as String    : tagData,
-                    kSecAttrAccessControl as String     : accessControl!
-                ]
+                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+                kSecAttrKeySizeInBits as String: 256,
+                kSecPrivateKeyAttrs as String: [
+                    kSecAttrIsPermanent as String: true,
+                    kSecAttrApplicationTag as String: tagData,
+                    kSecAttrAccessControl as String: accessControl!,
+                ],
             ]
             #if targetEnvironment(simulator)
             #else
-              parameterTemp[kSecAttrTokenID as String] = kSecAttrTokenIDSecureEnclave
+                parameterTemp[kSecAttrTokenID as String] = kSecAttrTokenIDSecureEnclave
             #endif
-            
+
             if flags.contains(.applicationPassword) {
                 let context = LAContext()
-                var newPassword : Data?
+                var newPassword: Data?
                 if let password = password, !password.isEmpty {
                     newPassword = password.data(using: .utf8)
                 }
                 context.setCredential(newPassword, type: .applicationPassword)
                 parameterTemp[kSecUseAuthenticationContext as String] = context
             }
-            
+
             parameter = parameterTemp as CFDictionary
             var secKeyCreateRandomKeyError: Unmanaged<CFError>?
             guard let secKey = SecKeyCreateRandomKey(parameter, &secKeyCreateRandomKeyError)
             else {
                 throw secKeyCreateRandomKeyError!.takeRetainedValue() as Error
             }
-            
+
             return secKey
         } else {
             throw CustomError.runtimeError("Invalid TAG") as Error
         }
     }
-    
-    func getPublicKey(tag: String, password: String?) throws -> Data? {
+
+    /// Returns the public key bytes for `tag`, creating the key-pair if needed.
+    /// - Parameters:
+    ///   - tag: your unique key namespace
+    ///   - level: "secure" (no user prompt) or "high" (Face/Touch ID or passcode required)
+    func getPublicKey(tag: String, password: String?, level: String = "secure") throws -> Data {
         let secKey: SecKey
-        let publicKey: SecKey
-        
-        do {
-            if isKeyCreated(tag: tag, password: password) {
-                secKey = try getSecKey(tag: tag, password: password)!
-            } else {
-                secKey = try generateKeyPair(tag: tag, password: password)
-            }
-            publicKey = SecKeyCopyPublicKey(secKey)!
-        } catch {
-            throw error
-        }
-        
-        var error: Unmanaged<CFError>?
-        if let keyData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? {
-            return keyData
+
+        if let existing = try? getSecKey(tag: tag, level: level) {
+            secKey = existing
         } else {
-            return nil
+            secKey = try generateKeyPair(tag: tag, password: password, level: level)
         }
+
+        guard let pubKey = SecKeyCopyPublicKey(secKey) else {
+            throw NSError(
+                domain: NSOSStatusErrorDomain, code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to extract public key"])
+        }
+
+        var cfError: Unmanaged<CFError>?
+        guard let data = SecKeyCopyExternalRepresentation(pubKey, &cfError) as Data? else {
+            throw cfError!.takeRetainedValue() as Error
+        }
+        return data
     }
-    
+
     func sign(tag: String, password: String?, payload: Data) throws -> Data? {
         let secKey: SecKey
         do {
@@ -166,14 +214,16 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         } catch {
             throw error
         }
-        
+
         var error: Unmanaged<CFError>?
-        guard let signData = SecKeyCreateSignature(
-            secKey,
-            SecKeyAlgorithm.ecdsaSignatureMessageX962SHA256,
-            payload as CFData,
-            &error
-        ) else {
+        guard
+            let signData = SecKeyCreateSignature(
+                secKey,
+                SecKeyAlgorithm.ecdsaSignatureMessageX962SHA256,
+                payload as CFData,
+                &error
+            )
+        else {
             if let e = error {
                 throw e.takeUnretainedValue() as Error
             }
@@ -181,21 +231,23 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         }
         return signData as Data
     }
-    
+
     func verify(payload: Data, publicKey: Data, signature: Data) throws -> Bool {
         let newPublicParams: [String: Any] = [
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
             kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-            kSecAttrKeySizeInBits as String: 256
+            kSecAttrKeySizeInBits as String: 256,
         ]
-        guard let newPublicKey = SecKeyCreateWithData(
-            publicKey as CFData,
-            newPublicParams as CFDictionary,
-            nil
-        ) else {
+        guard
+            let newPublicKey = SecKeyCreateWithData(
+                publicKey as CFData,
+                newPublicParams as CFDictionary,
+                nil
+            )
+        else {
             return false
         }
-        
+
         let verify = SecKeyVerifySignature(
             newPublicKey,
             SecKeyAlgorithm.ecdsaSignatureMessageX962SHA256,
@@ -205,15 +257,16 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         )
         return verify
     }
-    
+
     func getSharedSecret(tag: String, password: String?, publicKeyData: Data) throws -> Data? {
         let secKey: SecKey
         let publicKey: SecKey
-        let publicKeyAttributes = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPublic
-        ] as CFDictionary
-        
+        let publicKeyAttributes =
+            [
+                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+                kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+            ] as CFDictionary
+
         var error: Unmanaged<CFError>?
         do {
             secKey = try getSecKey(tag: tag, password: password)!
@@ -221,51 +274,110 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         } catch {
             throw error
         }
-        
-        let sharedSecretData = SecKeyCopyKeyExchangeResult(
-            secKey,
-            SecKeyAlgorithm.ecdhKeyExchangeStandard,
-            publicKey,
-            [:] as CFDictionary,
-            &error
-        ) as Data?
+
+        let sharedSecretData =
+            SecKeyCopyKeyExchangeResult(
+                secKey,
+                SecKeyAlgorithm.ecdhKeyExchangeStandard,
+                publicKey,
+                [:] as CFDictionary,
+                &error
+            ) as Data?
         return sharedSecretData
     }
-    
-    internal func getSecKey(tag: String, password: String?) throws -> SecKey?  {
+
+    // Encrypt using the enclave’s public key (ECIES / you can choose algorithm).
+    private func encryptDataECIES(tag: String, plaintext: Data) throws -> FlutterStandardTypedData {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: tag,
+            kSecReturnRef as String: true,
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+            let pubKey = item as! SecKey?
+        else {
+            throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
+        }
+        // Encrypt with ECIES (cofactor mode + AES-GCM)
+        var error: Unmanaged<CFError>?
+        guard
+            let cipher = SecKeyCreateEncryptedData(
+                pubKey,
+                .eciesEncryptionCofactorX963SHA256AESGCM,
+                plaintext as CFData,
+                &error
+            ) as Data?
+        else {
+            throw error!.takeRetainedValue()
+        }
+        return FlutterStandardTypedData(bytes: cipher)
+    }
+
+    // Decrypt inside the Secure Enclave
+    private func decryptDataECIES(tag: String, ciphertext: Data) throws -> FlutterStandardTypedData
+    {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
+            kSecAttrApplicationTag as String: tag,
+            kSecReturnRef as String: true,
+            kSecUseAuthenticationContext as String: LAContext(),
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+            let privKey = item as! SecKey?
+        else {
+            throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
+        }
+        // Perform decryption
+        var error: Unmanaged<CFError>?
+        guard
+            let plain = SecKeyCreateDecryptedData(
+                privKey,
+                .eciesEncryptionCofactorX963SHA256AESGCM,
+                ciphertext as CFData,
+                &error
+            ) as Data?
+        else {
+            throw error!.takeRetainedValue()
+        }
+        return FlutterStandardTypedData(bytes: plain)
+    }
+
+    /// Retrieves the enclave private key reference for `tag`, applying user auth if `level == "high"`.
+    /// - Parameters:
+    ///   - tag: your unique key namespace
+    ///   - level: "secure" or "high"
+    internal func getSecKey(tag: String, password: String?, level: String = "secure") throws
+        -> SecKey
+    {
         let tagData = tag.data(using: .utf8)!
         var query: [String: Any] = [
-            kSecClass as String                 : kSecClassKey,
-            kSecAttrApplicationTag as String    : tagData,
-            kSecAttrKeyType as String           : kSecAttrKeyTypeEC,
-            kSecMatchLimit as String            : kSecMatchLimitOne ,
-            kSecReturnRef as String             : true
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: tagData,
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecReturnRef as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
-        
-        if let password = password, !password.isEmpty {
-            let context = LAContext()
-            let newPassword = password.data(using: .utf8)
-            context.setCredential(newPassword, type: .applicationPassword)
-            query[kSecUseAuthenticationContext as String] = context
+
+        if level == "high" {
+            let ctx = LAContext()
+            ctx.localizedReason = "Authenticate to use your high-security key"
+            query[kSecUseAuthenticationContext as String] = ctx
         }
-        
+
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess else {
+        guard status == errSecSuccess, let key = item as? SecKey else {
+            let msg = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
             throw NSError(
-                domain: NSOSStatusErrorDomain,
-                code: Int(status),
-                userInfo: [NSLocalizedDescriptionKey: SecCopyErrorMessageString(status,nil) ?? "Undefined error"]
-            )
+                domain: NSOSStatusErrorDomain, code: Int(status),
+                userInfo: [NSLocalizedDescriptionKey: msg])
         }
-        
-        if let item = item {
-            return (item as! SecKey)
-        } else {
-            return nil
-        }
+        return key
     }
-    
+
     internal func isKeyCreated(tag: String, password: String?) -> Bool {
         do {
             let result = try getSecKey(tag: tag, password: password)
