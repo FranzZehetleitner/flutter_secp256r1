@@ -18,7 +18,7 @@ class SecureP256 {
     return ecPublicKeyFromX963(raw);
   }
 
-  static Future<List<int>> sign(String tag, Uint8List payload) async {
+  static Future<Uint8List> sign(String tag, Uint8List payload) async {
     assert(tag.isNotEmpty);
     assert(payload.isNotEmpty);
     final signature = await SecureP256Platform.instance.sign(tag, payload);
