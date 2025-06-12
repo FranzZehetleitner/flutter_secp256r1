@@ -347,6 +347,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         }
         // Perform decryption
         var error: Unmanaged<CFError>?
+
         guard
             let plain = SecKeyCreateDecryptedData(
                 privKey,
