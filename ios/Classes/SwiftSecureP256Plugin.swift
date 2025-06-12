@@ -231,22 +231,23 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         password: String?,
         payload: Data
     ) throws -> Data {
-        // Build a query that always uses an LAContext
-        //let context = LAContext()
-        //context.localizedReason = "Authenticate to sign data"
+
+        let context = LAContext()
+        context.localizedReason = "Authenticate to sign/decrypt"
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
             kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
             kSecAttrApplicationTag as String: tag,
             kSecReturnRef as String: true,
-                //kSecUseAuthenticationContext as String: context
+            kSecUseAuthenticationContext: context,
+
         ]
 
         // Fetch the SecKey (this will prompt only if userPresence was set)
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-            let keyToUse = item as? SecKey
+            let keyToUse = item as SecKey
         else {
             throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
         }
@@ -261,7 +262,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 &error
             ) as Data?
         else {
-            throw error?.takeRetainedValue() as Error
+            throw error.takeRetainedValue() as Error
         }
 
         return sigData
@@ -354,9 +355,9 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         tag: String,
         ciphertext: Data
     ) throws -> FlutterStandardTypedData {
+        let needsAuth = try requiresUserPresence(tag: tag)
+
         // Prepare context with a reason
-        let context = LAContext()
-        context.localizedReason = "Authenticate to decrypt data"
 
         // Query for the private key in Secure Enclave
         let query: [String: Any] = [
@@ -368,11 +369,16 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             kSecUseAuthenticationContext as String: context,
         ]
 
+        if needsAuth {
+            let authCtx = LAContext()
+            authCtx.localizedReason = "Authenticate to decrypt data"
+            query[kSecUseAuthenticationContext as String] = authCtx
+        }
         // Fetch the key (prompts if needed)
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess,
-            let keyToUse = item as? SecKey
+            let keyToUse = item as SecKey
         else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: nil)
         }
@@ -432,6 +438,44 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             return result != nil ? true : false
         } catch {
             return false
+        }
+    }
+
+    /// Returns true if this Secure Enclave private key was created
+    /// with `.userPresence` (i.e. will prompt Touch/Face ID or passcode).
+    internal func requiresUserPresence(tag: String) throws -> Bool {
+        let tagData = tag.data(using: .utf8)!
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+            kSecAttrApplicationTag as String: tagData,
+            kSecReturnRef as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+
+        // Non-interactive context
+        let ctx = LAContext()
+        ctx.interactionNotAllowed = true
+        query[kSecUseAuthenticationContext as String] = ctx
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        switch status {
+        case errSecSuccess:
+            // key exists and didn’t need UI
+            return false
+        case errSecInteractionNotAllowed:
+            // key exists but requires user-presence
+            return true
+        default:
+            // something else went wrong
+            throw NSError(
+                domain: NSOSStatusErrorDomain,
+                code: Int(status),
+                userInfo: nil
+            )
         }
     }
 }
