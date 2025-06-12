@@ -281,7 +281,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             nil
         )!
         var error: Unmanaged<CFError>?
-        let algorithm = SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
+        let algorithm = SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256
         guard SecKeyIsAlgorithmSupported(priv, .keyExchange, algorithm) else {
           throw NSError(domain: "NOT_SUPPORTED", code: -1, userInfo: nil)
 
