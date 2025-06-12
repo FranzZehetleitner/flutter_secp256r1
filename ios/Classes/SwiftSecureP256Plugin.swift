@@ -275,7 +275,8 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             publicKeyData as CFData,
             [
               kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-              kSecAttrKeyClass as String: kSecAttrKeyClassPublic
+              kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+              kSecAttrKeySizeInBits as String: 256
             ] as CFDictionary,
             nil
         )!
