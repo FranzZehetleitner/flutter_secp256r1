@@ -49,7 +49,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                     tag: tag,
                     password: password,
                     payload: payload
-                )!
+                )
                 result(FlutterStandardTypedData(bytes: signature))
             } catch {
                 result(
@@ -344,16 +344,16 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
         }
         // Encrypt with ECIES (cofactor mode + AES-GCM)
-        var error: Unmanaged<CFError>?
+        var cfErr: Unmanaged<CFError>?
         guard
             let cipher = SecKeyCreateEncryptedData(
                 pubKey,
                 .eciesEncryptionCofactorX963SHA256AESGCM,
                 plaintext as CFData,
-                &error
+                &cfErr
             ) as Data?
         else {
-            throw error!.takeRetainedValue()
+            throw cfErr!.takeRetainedValue()
         }
         return FlutterStandardTypedData(bytes: cipher)
     }
@@ -383,7 +383,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess,
-            let keyToUse = item as? SecKey
+            let keyToUse = item as SecKey
         else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: nil)
         }
