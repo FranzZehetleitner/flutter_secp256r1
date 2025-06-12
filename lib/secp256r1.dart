@@ -9,10 +9,10 @@ class SecureP256 {
   const SecureP256._();
 
   static Future<EcPublicKey> getPublicKey(String tag,
-      {bool securityLevelHigh = false, bool canDecrypt = false}) async {
+      {bool securityLevelHigh = false}) async {
     assert(tag.isNotEmpty);
-    final raw = await SecureP256Platform.instance.getPublicKey(tag,
-        securityLevelHigh: securityLevelHigh, canDecrypt: canDecrypt);
+    final raw = await SecureP256Platform.instance
+        .getPublicKey(tag, securityLevelHigh: securityLevelHigh);
 
     // ECDSA starts with 0x04 and 65 length.
     return ecPublicKeyFromX963(raw);
