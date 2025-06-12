@@ -66,44 +66,4 @@ class SecureP256 {
       ciphertext,
     );
   }
-
-  /// Return [iv, cipher].
-/*static Future<Tuple2<Uint8List, Uint8List>> encrypt({
-    required Uint8List sharedSecret,
-    required Uint8List message,
-  }) async {
-    assert(sharedSecret.isNotEmpty);
-    assert(message.isNotEmpty);
-    final sharedX = sharedSecret.sublist(0, 32);
-    final iv = Uint8List.fromList(randomAsU8a(12));
-    final cipher = await aes256GcmEncrypt(
-      req: AesEncryptReq(
-        key: sharedX,
-        iv: Uint8List.fromList(iv),
-        message: message,
-      ),
-    );
-    return Tuple2(iv, cipher);
-  }
-
-  static Future<Uint8List> decrypt({
-    required Uint8List sharedSecret,
-    required Uint8List iv,
-    required Uint8List cipher,
-  }) async {
-    assert(sharedSecret.isNotEmpty);
-    assert(iv.lengthInBytes == 12);
-    assert(cipher.isNotEmpty);
-    final sharedX = sharedSecret.sublist(0, 32);
-    final decryptedMessage256 = await aes256GcmDecrypt(
-      req: AesDecryptReq(
-        key: sharedX,
-        iv: iv,
-        cipherText: cipher,
-      ),
-    );
-    return decryptedMessage256;
-  }
-
-   */
 }

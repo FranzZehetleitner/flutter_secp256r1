@@ -291,6 +291,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: tag,
+            kSecAttrKeyClass as String:       kSecAttrKeyClassPublic,
             kSecReturnRef as String: true,
         ]
         var item: CFTypeRef?
