@@ -8,5 +8,3 @@ class Methods {
   static const encryptData = 'encryptData';
   static const decryptData = 'decryptData';
 }
-
-enum SecurityLevel { high, secure }

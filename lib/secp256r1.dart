@@ -10,10 +10,10 @@ class SecureP256 {
   const SecureP256._();
 
   static Future<ECPublicKey> getPublicKey(String tag,
-      [SecurityLevel? securityLevel]) async {
+      [bool securityLevelHigh = false]) async {
     assert(tag.isNotEmpty);
     final raw =
-        await SecureP256Platform.instance.getPublicKey(tag, securityLevel);
+    await SecureP256Platform.instance.getPublicKey(tag, securityLevelHigh);
     // ECDSA starts with 0x04 and 65 length.
     return parseP256PublicKey(raw);
   }
@@ -33,11 +33,9 @@ class SecureP256 {
     }
   }
 
-  static Future<bool> verify(
-    Uint8List payload,
-    ECPublicKey publicKey,
-    Uint8List signature,
-  ) {
+  static Future<bool> verify(Uint8List payload,
+      ECPublicKey publicKey,
+      Uint8List signature,) {
     assert(payload.isNotEmpty);
     assert(signature.isNotEmpty);
     Uint8List rawKey = EcdsaUtil.ecPublicKeyToRaw(publicKey);
@@ -78,7 +76,7 @@ class SecureP256 {
     );
   }
 
-  /// Return [iv, cipher].
+/// Return [iv, cipher].
 /*static Future<Tuple2<Uint8List, Uint8List>> encrypt({
     required Uint8List sharedSecret,
     required Uint8List message,
