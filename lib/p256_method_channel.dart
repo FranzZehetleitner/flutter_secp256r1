@@ -12,12 +12,12 @@ class SecureP256Channel extends SecureP256Platform {
 
   @override
   Future<Uint8List> getPublicKey(String tag,
-      [bool securityLevelHigh = false, bool canDecrypt = false]) async {
+      {bool securityLevelHigh = false, bool canDecrypt = false}) async {
     final keyBytes = await methodChannel.invokeMethod(
       Methods.getPublicKey,
       {
         'tag': tag,
-        'securityLevel': securityLevelHigh ? "secure" : "high",
+        'securityLevel': securityLevelHigh ? "high" : "secure",
         'canDecrypt': canDecrypt
       },
     );

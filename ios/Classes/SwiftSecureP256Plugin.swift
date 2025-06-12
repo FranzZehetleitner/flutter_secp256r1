@@ -377,11 +377,12 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
-        if level == "high" {
+        /*if level == "high" {
             let ctx = LAContext()
             ctx.localizedReason = "Authenticate to use your high-security key"
             query[kSecUseAuthenticationContext as String] = ctx
         }
+        */
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
