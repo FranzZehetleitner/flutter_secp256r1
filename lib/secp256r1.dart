@@ -18,10 +18,11 @@ class SecureP256 {
     return parseP256PublicKey(raw);
   }
 
-  static Future<Uint8List> sign(String tag, Uint8List payload) async {
+  static Future<List<int>> sign(String tag, Uint8List payload) async {
     assert(tag.isNotEmpty);
     assert(payload.isNotEmpty);
     final signature = await SecureP256Platform.instance.sign(tag, payload);
+    print(signature);
     if (EcdsaUtil.isDerSignature(signature)) {
       return EcdsaUtil.derToRaw(signature);
     } else {

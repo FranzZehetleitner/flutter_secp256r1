@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:pointycastle/asn1/asn1_parser.dart';
 import 'package:pointycastle/asn1/primitives/asn1_integer.dart';
 import 'package:pointycastle/asn1/primitives/asn1_sequence.dart';
 import 'package:pointycastle/ecc/api.dart';
@@ -38,24 +37,26 @@ class EcdsaUtil {
 
   /// Decode a DER‐encoded ECDSA signature (ASN.1 SEQUENCE of two INTEGERS)
   /// into the raw 64-byte [r||s] form, padding each to exactly 32 bytes.
-  static Uint8List derToRaw(Uint8List derSig) {
-    final parser = ASN1Parser(derSig);
-    final seq = parser.nextObject() as ASN1Sequence;
-    final rInt = seq.elements![0] as ASN1Integer;
-    final sInt = seq.elements![1] as ASN1Integer;
+  static List<int> derToRaw(Uint8List der, {int partLength = 32}) {
+    final seq = ASN1Sequence.fromBytes(der);
+    final rBytes = (seq.elements?[0] as ASN1Integer).valueBytes!;
+    final sBytes = (seq.elements?[1] as ASN1Integer).valueBytes!;
 
-    Uint8List pad(Uint8List v) {
-      // Ensure exactly 32 bytes, left-pad with zeros if needed
-      if (v.length == 32) return v;
-      if (v.length > 32) throw ArgumentError('Integer too large');
-      final out = Uint8List(32);
-      out.setRange(32 - v.length, 32, v);
-      return out;
+    List<int> normalize(List<int> bytes) {
+      // strip DER sign-byte if present
+      if (bytes.length == partLength + 1 && bytes.first == 0) {
+        bytes = bytes.sublist(1);
+      }
+      if (bytes.length > partLength) {
+        throw ArgumentError('Integer too large: ${bytes.length} > $partLength');
+      }
+      return List.filled(partLength - bytes.length, 0) + bytes;
     }
 
-    final r = pad(rInt.valueBytes!);
-    final s = pad(sInt.valueBytes!);
-    return Uint8List.fromList([...r, ...s]);
+    return [
+      ...normalize(rBytes),
+      ...normalize(sBytes),
+    ];
   }
 
   /// Wraps a raw 64-byte [r||s] ECDSA signature into a DER‐encoded ASN.1 SEQUENCE.
