@@ -23,7 +23,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                     password = pwd
                 }
 
-                let key = try getPublicKey(tag: tag, password: password, level: level)!
+                let key = try getPublicKey(tag: tag, password: password, level: level)
                 result(FlutterStandardTypedData(bytes: key))
             } catch {
                 result(
@@ -96,7 +96,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 let plaintext = (param!["plaintext"] as! FlutterStandardTypedData).data
 
                 let ciphertext = try encryptDataECIES(tag: tag, plaintext: plaintext)
-                result(FlutterStandardTypedData(bytes: ciphertext))
+                result(ciphertext)
             } catch {
                 result(
                     FlutterError(
@@ -110,7 +110,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 let ciphertext = (param!["ciphertext"] as! FlutterStandardTypedData).data
 
                 let plaintext = try decryptDataECIES(tag: tag, ciphertext: ciphertext)
-                result(FlutterStandardTypedData(bytes: plaintext))
+                result(plaintext)
             } catch {
                 result(
                     FlutterError(
@@ -125,7 +125,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
 
     func generateKeyPair(tag: String, password: String?, level: String) throws -> SecKey {
         let tagData = tag.data(using: .utf8)
-        let flags: SecAccessControlCreateFlags = [.privateKeyUsage]
+        var flags: SecAccessControlCreateFlags = [.privateKeyUsage]
         var accessError: Unmanaged<CFError>?
         if level == "high" {
             flags.insert(.userPresence)
@@ -188,7 +188,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     func getPublicKey(tag: String, password: String?, level: String = "secure") throws -> Data {
         let secKey: SecKey
 
-        if let existing = try? getSecKey(tag: tag, level: level) {
+        if let existing = try? getSecKey(tag: tag, password: password level: level) {
             secKey = existing
         } else {
             secKey = try generateKeyPair(tag: tag, password: password, level: level)
@@ -210,7 +210,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     func sign(tag: String, password: String?, payload: Data) throws -> Data? {
         let secKey: SecKey
         do {
-            secKey = try getSecKey(tag: tag, password: password)!
+            secKey = try getSecKey(tag: tag, password: password)
         } catch {
             throw error
         }
@@ -269,7 +269,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
 
         var error: Unmanaged<CFError>?
         do {
-            secKey = try getSecKey(tag: tag, password: password)!
+            secKey = try getSecKey(tag: tag, password: password)
             publicKey = SecKeyCreateWithData(publicKeyData as CFData, publicKeyAttributes, &error)!
         } catch {
             throw error
@@ -369,13 +369,13 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let key = item as? SecKey else {
+        guard status == errSecSuccess else {
             let msg = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
             throw NSError(
                 domain: NSOSStatusErrorDomain, code: Int(status),
                 userInfo: [NSLocalizedDescriptionKey: msg])
         }
-        return key
+        return item as! SecKey
     }
 
     internal func isKeyCreated(tag: String, password: String?) -> Bool {
