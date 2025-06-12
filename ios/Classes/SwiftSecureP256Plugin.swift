@@ -234,39 +234,47 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
 
         let context = LAContext()
         context.localizedReason = "Authenticate to sign/decrypt"
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
             kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
             kSecAttrApplicationTag as String: tag,
             kSecReturnRef as String: true,
-            kSecUseAuthenticationContext: context,
-
         ]
+
+        if try requiresUserPresence(tag: tag) {
+            let context = LAContext()
+            context.localizedReason = "Authenticate to sign data"
+            query[kSecUseAuthenticationContext as String] = context
+        }
 
         // Fetch the SecKey (this will prompt only if userPresence was set)
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-            let keyToUse = item as SecKey
+            let keyToUse = item? as SecKey
         else {
             throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
         }
 
         // Create the signature
-        var error: Unmanaged<CFError>?
+        var cfErr: Unmanaged<CFError>?
         guard
             let sigData = SecKeyCreateSignature(
                 keyToUse,
                 .ecdsaSignatureMessageX962SHA256,
                 payload as CFData,
-                &error
+                &cfErr
             ) as Data?
         else {
-            throw error.takeRetainedValue() as Error
+            throw cfErr?.takeRetainedValue()
+                ?? NSError(
+                    domain: NSOSStatusErrorDomain, code: -1, userInfo: nil
+                )
         }
 
         return sigData
     }
+
     func verify(payload: Data, publicKey: Data, signature: Data) throws -> Bool {
         let newPublicParams: [String: Any] = [
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
@@ -356,17 +364,14 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         ciphertext: Data
     ) throws -> FlutterStandardTypedData {
         let needsAuth = try requiresUserPresence(tag: tag)
-
         // Prepare context with a reason
-
         // Query for the private key in Secure Enclave
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
             kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
             kSecAttrApplicationTag as String: tag as CFString,
             kSecReturnRef as String: true,
-            kSecUseAuthenticationContext as String: context,
         ]
 
         if needsAuth {
@@ -378,7 +383,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess,
-            let keyToUse = item as SecKey
+            let keyToUse = item as? SecKey
         else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: nil)
         }
@@ -393,7 +398,10 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 &error
             ) as Data?
         else {
-            throw error!.takeRetainedValue()
+            throw error?.takeRetainedValue()
+                ?? NSError(
+                    domain: NSOSStatusErrorDomain, code: -1, userInfo: nil
+                )
         }
 
         return FlutterStandardTypedData(bytes: plainData)
