@@ -188,7 +188,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     func getPublicKey(tag: String, password: String?, level: String = "secure") throws -> Data {
         let secKey: SecKey
 
-        if let existing = try? getSecKey(tag: tag, password: password level: level) {
+        if let existing = try? getSecKey(tag: tag, password: password, level: level) {
             secKey = existing
         } else {
             secKey = try generateKeyPair(tag: tag, password: password, level: level)
