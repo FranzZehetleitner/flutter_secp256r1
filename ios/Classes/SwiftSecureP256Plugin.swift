@@ -82,7 +82,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 }
 
                 let sharedSecret = try getSharedSecret(
-                    tag: tag, password: password, publicKeyData: publicKeyData)!
+                    tag: tag, password: password, publicKeyData: publicKeyData)
                 result(FlutterStandardTypedData(bytes: sharedSecret))
             } catch {
                 result(
