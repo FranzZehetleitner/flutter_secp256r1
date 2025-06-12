@@ -17,13 +17,14 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             do {
                 let param = call.arguments as? [String: Any]
                 let tag = param!["tag"] as! String
+                let canDecrypt = (param!["canDecrypt"] as? Bool) ?? false
                 let level = (param!["securityLevel"] as? String) ?? "secure"
                 var password: String? = nil
                 if let pwd = param!["password"] as? String {
                     password = pwd
                 }
 
-                let key = try getPublicKey(tag: tag, password: password, level: level)
+                let key = try getPublicKey(tag: tag, password: password, level: level, canDecrypt: canDecrypt)
                 result(FlutterStandardTypedData(bytes: key))
             } catch {
                 result(
@@ -123,7 +124,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         }
     }
 
-    func generateKeyPair(tag: String, password: String?, level: String) throws -> SecKey {
+    func generateKeyPair(tag: String, password: String?, level: String, canDecrypt: Bool) throws -> SecKey {
         let tagData = tag.data(using: .utf8)
         var flags: SecAccessControlCreateFlags = [.privateKeyUsage]
         var accessError: Unmanaged<CFError>?
@@ -144,14 +145,24 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         var parameterTemp: [String: Any]
 
         if let tagData = tagData {
+              // PRIVATE-key attrs: persistent, tagged, decrypt-enabled
+            let privateAttrs: [String: Any] = [
+                kSecAttrIsPermanent as String:    true,
+                kSecAttrApplicationTag as String: tagData,
+                kSecAttrAccessControl as String:  accessControl,
+                kSecAttrCanDecrypt as String:     canDecrypt,
+            ]
+            // PUBLIC-key attrs: persistent, tagged
+            let publicAttrs: [String: Any] = [
+                kSecAttrIsPermanent as String:    true,
+                kSecAttrApplicationTag as String: tagData,
+                kSecAttrCanEncrypt as String:     canDecrypt,
+            ]
             parameterTemp = [
                 kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
                 kSecAttrKeySizeInBits as String: 256,
-                kSecPrivateKeyAttrs as String: [
-                    kSecAttrIsPermanent as String: true,
-                    kSecAttrApplicationTag as String: tagData,
-                    kSecAttrAccessControl as String: accessControl!,
-                ],
+                kSecPrivateKeyAttrs as String:  privateAttrs,
+                kSecPublicKeyAttrs as String:   publicAttrs,
             ]
             #if targetEnvironment(simulator)
             #else
@@ -185,13 +196,13 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     /// - Parameters:
     ///   - tag: your unique key namespace
     ///   - level: "secure" (no user prompt) or "high" (Face/Touch ID or passcode required)
-    func getPublicKey(tag: String, password: String?, level: String = "secure") throws -> Data {
+    func getPublicKey(tag: String, password: String?, level: String = "secure", canDecrypt: Bool = false) throws -> Data {
         let secKey: SecKey
 
         if let existing = try? getSecKey(tag: tag, password: password, level: level) {
             secKey = existing
         } else {
-            secKey = try generateKeyPair(tag: tag, password: password, level: level)
+            secKey = try generateKeyPair(tag: tag, password: password, level: level, canDecrypt: canDecrypt)
         }
 
         guard let pubKey = SecKeyCopyPublicKey(secKey) else {

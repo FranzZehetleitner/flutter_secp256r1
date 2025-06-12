@@ -26,8 +26,9 @@ abstract class SecureP256Platform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<Uint8List> getPublicKey(String tag, [bool securityLevelHigh = false]) {
-    return _instance.getPublicKey(tag, securityLevelHigh);
+  Future<Uint8List> getPublicKey(String tag,
+      [bool securityLevelHigh = false, bool canDecrypt = false]) {
+    return _instance.getPublicKey(tag, securityLevelHigh, canDecrypt);
   }
 
   Future<Uint8List> sign(String tag, Uint8List payload) {
