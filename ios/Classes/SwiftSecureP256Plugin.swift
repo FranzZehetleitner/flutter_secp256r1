@@ -251,7 +251,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         // Fetch the SecKey (this will prompt only if userPresence was set)
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-            let keyToUse = item as! SecKey
+            let keyToUse = item as? SecKey
         else {
             throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
         }
@@ -383,7 +383,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess,
-            let keyToUse = item as! SecKey
+            let keyToUse = item as? SecKey
         else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: nil)
         }
