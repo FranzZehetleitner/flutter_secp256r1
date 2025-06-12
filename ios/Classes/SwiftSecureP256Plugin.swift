@@ -288,6 +288,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             userInfo:[NSLocalizedDescriptionKey:"Cofactor ECDH not supported"]
           )
         }
+
         guard let secret = SecKeyCopyKeyExchangeResult(
             priv,
             algorithm,
