@@ -270,33 +270,31 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     }
 
     func getSharedSecret(tag: String, password: String?, publicKeyData: Data) throws -> Data? {
-        let priv = try getSecKey(tag: tag, password: password)
-        let pub = SecKeyCreateWithData(
-            publicKeyData as CFData,
+        let secKey: SecKey
+        let publicKey: SecKey
+        let publicKeyAttributes =
             [
-              kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-              kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-              kSecAttrKeySizeInBits as String: 256
-            ] as CFDictionary,
-            nil
-        )!
+                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+                kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+            ] as CFDictionary
+
         var error: Unmanaged<CFError>?
-        let algorithm = SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256
-        guard SecKeyIsAlgorithmSupported(priv, .keyExchange, algorithm) else {
-          throw NSError(domain: "NOT_SUPPORTED", code: -1, userInfo: nil)
-
+        do {
+            secKey = try getSecKey(tag: tag, password: password)
+            publicKey = SecKeyCreateWithData(publicKeyData as CFData, publicKeyAttributes, &error)!
+        } catch {
+            throw error
         }
 
-        guard let secret = SecKeyCopyKeyExchangeResult(
-            priv,
-            algorithm,
-            pub,
-            [:] as CFDictionary,
-            &error
-        ) as Data? else {
-          throw error!.takeRetainedValue() as Error
-        }
-        return secret
+        let sharedSecretData =
+            SecKeyCopyKeyExchangeResult(
+                secKey,
+                SecKeyAlgorithm.ecdhKeyExchangeStandard,
+                publicKey,
+                [:] as CFDictionary,
+                &error
+            ) as Data?
+        return sharedSecretData
     }
 
     // Encrypt using the enclave’s public key (ECIES / you can choose algorithm).
