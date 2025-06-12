@@ -12,9 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.0.2
-
-  agent_dart: ^1.0.0-dev.25
-  agent_dart_base: ^1.0.0-dev.25
+  pointycastle: ^4.0.0
   tuple: ^2.0.0
 
 dev_dependencies:
