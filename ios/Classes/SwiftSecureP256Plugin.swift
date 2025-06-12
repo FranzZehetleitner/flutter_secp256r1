@@ -2,7 +2,6 @@ import Flutter
 import Foundation
 import LocalAuthentication
 import UIKit
-import CryptoKit
 
 public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -270,26 +269,33 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         return verify
     }
 
-func getSharedSecret(tag: String,
-                     password: String?,
-                     publicKeyData: Data) throws -> Data
-{
-  // 1. Get your private SecKey (from keychain, Secure Enclave, etc.)
-  let secKey = try getSecKey(tag: tag, password: password)
+    func getSharedSecret(tag: String, password: String?, publicKeyData: Data) throws -> Data? {
+        let secKey: SecKey
+        let publicKey: SecKey
+        let publicKeyAttributes =
+            [
+                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+                kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+            ] as CFDictionary
 
-  // 2. Turn it into a CryptoKit private key
-  let privData = SecKeyCopyExternalRepresentation(secKey, nil)! as Data
-  let privateKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: privData)
+        var error: Unmanaged<CFError>?
+        do {
+            secKey = try getSecKey(tag: tag, password: password)
+            publicKey = SecKeyCreateWithData(publicKeyData as CFData, publicKeyAttributes, &error)!
+        } catch {
+            throw error
+        }
 
-  // 3. Import peer’s public key
-  let publicKey = try P256.KeyAgreement.PublicKey(rawRepresentation: publicKeyData)
-
-  // 4. Derive the shared secret
-  let sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: publicKey)
-
-  // 5. (Optional) turn that into raw bytes
-  return sharedSecret.withUnsafeBytes { Data($0) }
-}
+        let sharedSecretData =
+            SecKeyCopyKeyExchangeResult(
+                secKey,
+                SecKeyAlgorithm.ecdhKeyExchangeStandard,
+                publicKey,
+                [:] as CFDictionary,
+                &error
+            ) as Data?
+        return sharedSecretData
+    }
     // Encrypt using the enclave’s public key (ECIES / you can choose algorithm).
     private func encryptDataECIES(tag: String, plaintext: Data) throws -> FlutterStandardTypedData {
         let query: [String: Any] = [
