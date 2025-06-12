@@ -269,51 +269,39 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         return verify
     }
 
-   func getSharedSecret(tag: String, password: String?,
-                        publicKeyData: Data) throws -> Data
-   {
-       // 1. Load your private key however you do (e.g. from the keychain)
-       let privateKey = try getSecKey(tag: tag, password: password)
+func getSharedSecret(tag: String,
+                     password: String?,
+                     publicKeyData: Data) throws -> Data
+{
+    let privateKey = try getSecKey(tag: tag, password: password)
 
-       // 2. Import the peer’s public key *with* a size attribute
-       var error: Unmanaged<CFError>?
-       let pubAttrs: [String: Any] = [
-         kSecAttrKeyType as String:       kSecAttrKeyTypeECSECPrimeRandom,
-         kSecAttrKeyClass as String:      kSecAttrKeyClassPublic,
-         kSecAttrKeySizeInBits as String: 256
-       ]
-       guard let publicKey = SecKeyCreateWithData(publicKeyData as CFData,
-                                                  pubAttrs as CFDictionary,
-                                                  &error)
-       else { throw error!.takeRetainedValue() as Error }
+    var error: Unmanaged<CFError>?
+    let pubAttrs: [String: Any] = [
+        kSecAttrKeyType as String:       kSecAttrKeyTypeECSECPrimeRandom,
+        kSecAttrKeyClass as String:      kSecAttrKeyClassPublic,
+        kSecAttrKeySizeInBits as String: 256
+    ]
+    guard let publicKey = SecKeyCreateWithData(publicKeyData as CFData,
+                                               pubAttrs as CFDictionary,
+                                               &error)
+    else { throw error!.takeRetainedValue() as Error }
 
-       // 3. Choose the KDF-using algorithm
-       let algorithm: SecKeyAlgorithm = .ecdhKeyExchangeStandardX963SHA256
+    let algorithm: SecKeyAlgorithm = .ecdhKeyExchangeStandardX963SHA256
+    let params = [ SecKeyKeyExchangeParameter.requestedSize: 32 ] as CFDictionary
 
-       // 4. Ensure both keys support it
-       guard SecKeyIsAlgorithmSupported(privateKey, .keyExchange, algorithm),
-             SecKeyIsAlgorithmSupported(publicKey, .keyExchange, algorithm)
-       else {
-         throw NSError(domain: NSOSStatusErrorDomain,
-                       code: -50,
-                       userInfo: [NSLocalizedDescriptionKey:
-                         "ECDH algorithm not supported by one of the keys"])
-       }
+    // unwrap the CFData? result here
+    guard let cfShared = SecKeyCopyKeyExchangeResult(privateKey,
+                                                     algorithm,
+                                                     publicKey,
+                                                     params,
+                                                     &error)
+    else {
+        throw error!.takeRetainedValue() as Error
+    }
 
-       // 5. Perform the exchange with requestedSize=32
-       let params = [ SecKeyKeyExchangeParameter.requestedSize: 32 ] as CFDictionary
-       guard let shared = SecKeyCopyKeyExchangeResult(privateKey,
-                                                      algorithm,
-                                                      publicKey,
-                                                      params,
-                                                      &error)
-                        as Data?
-       else {
-         throw error!.takeRetainedValue() as Error
-       }
-
-       return shared
-   }
+    // now cfShared is CFData, which bridges to Data
+    return cfShared as Data
+}
     // Encrypt using the enclave’s public key (ECIES / you can choose algorithm).
     private func encryptDataECIES(tag: String, plaintext: Data) throws -> FlutterStandardTypedData {
         let query: [String: Any] = [
