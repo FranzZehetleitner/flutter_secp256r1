@@ -219,22 +219,18 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     }
 
     func sign(tag: String, password: String?, payload: Data) throws -> Data? {
-        let secKey: SecKey
-        do {
-            secKey = try getSecKey(tag: tag, password: password)
-        } catch {
-            throw error
-        }
+        let privKey = try fetchKey(tag: tag,
+                                    password: password,
+                                    level: /* "secure" or "high" */,
+                                    role: .private)
 
-        var error: Unmanaged<CFError>?
-        guard
-            let signData = SecKeyCreateSignature(
-                secKey,
-                SecKeyAlgorithm.ecdsaSignatureMessageX962SHA256,
+          var error: Unmanaged<CFError>?
+        guard let sig = SecKeyCreateSignature(
+                privKey,
+                .ecdsaSignatureMessageX962SHA256,
                 payload as CFData,
                 &error
-            )
-        else {
+        ) as Data? else {
             if let e = error {
                 throw e.takeUnretainedValue() as Error
             }
@@ -299,19 +295,11 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
 
     // Encrypt using the enclave’s public key (ECIES / you can choose algorithm).
     private func encryptDataECIES(tag: String, plaintext: Data) throws -> FlutterStandardTypedData {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: tag,
-            kSecAttrKeyClass as String:       kSecAttrKeyClassPublic,
-            kSecReturnRef as String: true,
-        ]
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-            let pubKey = item as! SecKey?
-        else {
-            throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
-        }
-        // Encrypt with ECIES (cofactor mode + AES-GCM)
+        let pubKey = try fetchKey(tag:   tag,
+                                   password: nil,
+                                   level: "secure",
+                                   role:  .public)
+
         var error: Unmanaged<CFError>?
         guard
             let cipher = SecKeyCreateEncryptedData(
@@ -332,9 +320,9 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
-            kSecAttrKeyClass as String:           kSecAttrKeyClassPrivate,
             kSecAttrApplicationTag as String: tag,
             kSecReturnRef as String: true,
+            kSecAttrKeyClass as String:           kSecAttrKeyClassPrivate,
             kSecUseAuthenticationContext as String: LAContext(),
         ]
         var item: CFTypeRef?
@@ -358,6 +346,51 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         return FlutterStandardTypedData(bytes: plain)
     }
 
+    enum KeyRole {
+      case `public`
+      case `private`
+    }
+
+    internal func fetchKey(
+      tag: String,
+      password: String?,
+      level: String = "secure",
+      role: KeyRole
+    ) throws -> SecKey {
+      let tagData = tag.data(using: .utf8)!
+      var query: [String: Any] = [
+        kSecClass as String:              kSecClassKey,
+        kSecAttrApplicationTag as String: tagData,
+        kSecAttrKeyType as String:        kSecAttrKeyTypeECSECPrimeRandom,
+        kSecReturnRef as String:          true,
+        kSecMatchLimit as String:         kSecMatchLimitOne,
+        // ← THIS is the magic:
+        kSecAttrKeyClass as String:       (role == .public
+                                           ? kSecAttrKeyClassPublic
+                                           : kSecAttrKeyClassPrivate),
+      ]
+
+      #if !targetEnvironment(simulator)
+      // if it's enclave-backed, only match the enclave token
+      query[kSecAttrTokenID as String] = kSecAttrTokenIDSecureEnclave
+      #endif
+
+      if level == "high" {
+        let ctx = LAContext()
+        ctx.localizedReason = "Authenticate to decrypt"
+        query[kSecUseAuthenticationContext as String] = ctx
+      }
+
+      var item: CFTypeRef?
+      let status = SecItemCopyMatching(query as CFDictionary, &item)
+      guard status == errSecSuccess, let key = item as? SecKey else {
+        let message = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error"
+        throw NSError(domain: NSOSStatusErrorDomain,
+                      code: Int(status),
+                      userInfo: [NSLocalizedDescriptionKey: message])
+      }
+      return key
+    }
     /// Retrieves the enclave private key reference for `tag`, applying user auth if `level == "high"`.
     /// - Parameters:
     ///   - tag: your unique key namespace
