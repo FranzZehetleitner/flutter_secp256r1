@@ -270,6 +270,9 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         return verify
     }
 
+func getSharedSecret(tag: String,
+                     password: String?,
+                     publicKeyData: Data) throws -> Data
 {
   // 1. Get your private SecKey (from keychain, Secure Enclave, etc.)
   let secKey = try getSecKey(tag: tag, password: password)
