@@ -270,31 +270,34 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     }
 
     func getSharedSecret(tag: String, password: String?, publicKeyData: Data) throws -> Data? {
-        let secKey: SecKey
-        let publicKey: SecKey
-        let publicKeyAttributes =
+        let priv = try getSecKey(tag: tag, password: password)
+        let pub = SecKeyCreateWithData(
+            publicKeyData as CFData,
             [
-                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-                kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-            ] as CFDictionary
-
+              kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+              kSecAttrKeyClass as String: kSecAttrKeyClassPublic
+            ] as CFDictionary,
+            nil
+        )!
         var error: Unmanaged<CFError>?
-        do {
-            secKey = try getSecKey(tag: tag, password: password)
-            publicKey = SecKeyCreateWithData(publicKeyData as CFData, publicKeyAttributes, &error)!
-        } catch {
-            throw error
+        let algorithm = SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
+        guard SecKeyIsAlgorithmSupported(priv, .keyExchange, algorithm) else {
+          throw NSError(
+            domain: NSOSStatusErrorDomain,
+            code: errSecUnsupportedAlgorithm,
+            userInfo:[NSLocalizedDescriptionKey:"Cofactor ECDH not supported"]
+          )
         }
-
-        let sharedSecretData =
-            SecKeyCopyKeyExchangeResult(
-                secKey,
-                SecKeyAlgorithm.ecdhKeyExchangeStandard,
-                publicKey,
-                [:] as CFDictionary,
-                &error
-            ) as Data?
-        return sharedSecretData
+        guard let secret = SecKeyCopyKeyExchangeResult(
+            priv,
+            algorithm,
+            pub,
+            [:] as CFDictionary,
+            &error
+        ) as Data? else {
+          throw error!.takeRetainedValue() as Error
+        }
+        return secret
     }
 
     // Encrypt using the enclave’s public key (ECIES / you can choose algorithm).
