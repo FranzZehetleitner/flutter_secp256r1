@@ -250,11 +250,13 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
 
         // Fetch the SecKey (this will prompt only if userPresence was set)
         var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-            let keyToUse = item as? SecKey
-        else {
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        // 2) Ensure we got an item back
+        guard status == errSecSuccess, let anyRef = item else {
             throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
         }
+        // 3) Now cast unconditionally to SecKey
+        let keyToUse = anyRef as! SecKey
 
         // Create the signature
         var cfErr: Unmanaged<CFError>?
@@ -382,11 +384,12 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         // Fetch the key (prompts if needed)
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess,
-            let keyToUse = item as? SecKey
-        else {
-            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: nil)
+        // 2) Ensure we got an item back
+        guard status == errSecSuccess, let anyRef = item else {
+            throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
         }
+        // 3) Now cast unconditionally to SecKey
+        let keyToUse = anyRef as! SecKey
 
         // Decrypt inside the enclave
         var error: Unmanaged<CFError>?
