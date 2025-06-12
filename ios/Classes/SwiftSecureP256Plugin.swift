@@ -1,6 +1,7 @@
 import Flutter
 import Foundation
 import LocalAuthentication
+import Security
 import UIKit
 
 public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
@@ -24,7 +25,9 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                     password = pwd
                 }
 
-                let key = try getPublicKey(tag: tag, password: password, highSecurity: highSecurity, canDecrypt: canDecrypt)
+                let key = try getPublicKey(
+                    tag: tag, password: password, highSecurity: highSecurity, canDecrypt: canDecrypt
+                )
                 result(FlutterStandardTypedData(bytes: key))
             } catch {
                 result(
@@ -124,7 +127,9 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         }
     }
 
-    func generateKeyPair(tag: String, password: String?, highSecurity: Bool, canDecrypt: Bool) throws -> SecKey {
+    func generateKeyPair(tag: String, password: String?, highSecurity: Bool, canDecrypt: Bool)
+        throws -> SecKey
+    {
         let tagData = tag.data(using: .utf8)
         var flags: SecAccessControlCreateFlags = [.privateKeyUsage]
         var accessError: Unmanaged<CFError>?
@@ -145,24 +150,24 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         var parameterTemp: [String: Any]
 
         if let tagData = tagData {
-              // PRIVATE-key attrs: persistent, tagged, decrypt-enabled
+            // PRIVATE-key attrs: persistent, tagged, decrypt-enabled
             let privateAttrs: [String: Any] = [
-                kSecAttrIsPermanent as String:    true,
+                kSecAttrIsPermanent as String: true,
                 kSecAttrApplicationTag as String: tagData,
-                kSecAttrAccessControl as String:  accessControl,
-                kSecAttrCanDecrypt as String:     canDecrypt,
+                kSecAttrAccessControl as String: accessControl,
+                kSecAttrCanDecrypt as String: canDecrypt,
             ]
             // PUBLIC-key attrs: persistent, tagged
             let publicAttrs: [String: Any] = [
-                kSecAttrIsPermanent as String:    true,
+                kSecAttrIsPermanent as String: true,
                 kSecAttrApplicationTag as String: tagData,
-                kSecAttrCanEncrypt as String:     canDecrypt,
+                kSecAttrCanEncrypt as String: canDecrypt,
             ]
             parameterTemp = [
                 kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
                 kSecAttrKeySizeInBits as String: 256,
-                kSecPrivateKeyAttrs as String:  privateAttrs,
-                kSecPublicKeyAttrs as String:   publicAttrs,
+                kSecPrivateKeyAttrs as String: privateAttrs,
+                kSecPublicKeyAttrs as String: publicAttrs,
             ]
             #if targetEnvironment(simulator)
             #else
@@ -196,13 +201,16 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     /// - Parameters:
     ///   - tag: your unique key namespace
     ///   - level: "secure" (no user prompt) or "high" (Face/Touch ID or passcode required)
-    func getPublicKey(tag: String, password: String?, highSecurity: Bool = false, canDecrypt: Bool = false) throws -> Data {
+    func getPublicKey(
+        tag: String, password: String?, highSecurity: Bool = false, canDecrypt: Bool = false
+    ) throws -> Data {
         let secKey: SecKey
 
         if let existing = try? getSecKey(tag: tag, password: password, highSecurity: highSecurity) {
             secKey = existing
         } else {
-            secKey = try generateKeyPair(tag: tag, password: password, highSecurity: highSecurity, canDecrypt: canDecrypt)
+            secKey = try generateKeyPair(
+                tag: tag, password: password, highSecurity: highSecurity, canDecrypt: canDecrypt)
         }
 
         guard let pubKey = SecKeyCopyPublicKey(secKey) else {
@@ -219,51 +227,51 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     }
 
     func sign(tag: String, password: String?, payload: Data) throws -> Data? {
-       // 1) Fetch attributes + a non-prompting keyRef
-       let query: [String: Any] = [
-         kSecClass               as String: kSecClassKey,
-         kSecAttrTokenID         as String: kSecAttrTokenIDSecureEnclave,
-         kSecAttrKeyClass        as String: kSecAttrKeyClassPrivate,
-         kSecAttrApplicationTag  as String: tag,
-         kSecReturnRef           as String: true,
-         kSecReturnAttributes    as String: true,
-       ]
-       var item: CFTypeRef?
-       guard
-         SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-         let result = item as? [String: Any],
-         let initialKey = result[kSecValueRef as String] as? SecKey
-       else {
-         throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
-       }
+        // 1) Fetch attributes + a non-prompting keyRef
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+            kSecAttrApplicationTag as String: tag,
+            kSecReturnRef as String: true,
+            kSecReturnAttributes as String: true,
+        ]
+        var item: CFTypeRef?
+        guard
+            SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+            let result = item as? [String: Any],
+            let initialKey = result[kSecValueRef as String] as? SecKey
+        else {
+            throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
+        }
 
-       // 2) See if .userPresence was in the original access control
-       var needsAuth = false
-       if let ac = result[kSecAttrAccessControl as String] as? SecAccessControl,
-          let constraints = SecAccessControlGetConstraints(ac) as? [AnyHashable: Any],
-          constraints[kSecAccessControlUserPresence] != nil
-       {
-         needsAuth = true
-       }
+        // 2) See if .userPresence was in the original access control
+        var needsAuth = false
+        if let ac = result[kSecAttrAccessControl as String] as? SecAccessControl,
+            let constraints = SecAccessControlGetConstraints(ac) as? [AnyHashable: Any],
+            constraints[kSecAccessControlUserPresence] != nil
+        {
+            needsAuth = true
+        }
 
-       // 3) If we need to authenticate, re-fetch the key with LAContext
-       let keyToUse: SecKey
-       if needsAuth {
-         var authQuery = query
-         authQuery[kSecReturnAttributes as String] = false
-         authQuery[kSecUseAuthenticationContext as String] = LAContext()
+        // 3) If we need to authenticate, re-fetch the key with LAContext
+        let keyToUse: SecKey
+        if needsAuth {
+            var authQuery = query
+            authQuery[kSecReturnAttributes as String] = false
+            authQuery[kSecUseAuthenticationContext as String] = LAContext()
 
-         var item2: CFTypeRef?
-         guard
-           SecItemCopyMatching(authQuery as CFDictionary, &item2) == errSecSuccess,
-           let authKey = item2 as? SecKey
-         else {
-           throw NSError(domain: "AUTH_FAILED", code: -1, userInfo: nil)
-         }
-         keyToUse = authKey
-       } else {
-         keyToUse = initialKey
-       }
+            var item2: CFTypeRef?
+            guard
+                SecItemCopyMatching(authQuery as CFDictionary, &item2) == errSecSuccess,
+                let authKey = item2 as? SecKey
+            else {
+                throw NSError(domain: "AUTH_FAILED", code: -1, userInfo: nil)
+            }
+            keyToUse = authKey
+        } else {
+            keyToUse = initialKey
+        }
         var error: Unmanaged<CFError>?
         guard
             let signData = SecKeyCreateSignature(
@@ -340,7 +348,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: tag,
-            kSecAttrKeyClass as String:       kSecAttrKeyClassPublic,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
             kSecReturnRef as String: true,
         ]
         var item: CFTypeRef?
@@ -365,67 +373,74 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     }
 
     // Decrypt inside the Secure Enclave
-func decryptDataECIES(tag: String, ciphertext: Data) throws -> FlutterStandardTypedData {
-  // 1) Fetch attributes + a non-prompting keyRef
-  let query: [String: Any] = [
-    kSecClass               as String: kSecClassKey,
-    kSecAttrTokenID         as String: kSecAttrTokenIDSecureEnclave,
-    kSecAttrKeyClass        as String: kSecAttrKeyClassPrivate,
-    kSecAttrApplicationTag  as String: tag,
-    kSecReturnRef           as String: true,
-    kSecReturnAttributes    as String: true,
-  ]
-  var item: CFTypeRef?
-  guard
-    SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-    let result = item as? [String: Any],
-    let initialKey = result[kSecValueRef as String] as? SecKey
-  else {
-    throw NSError(domain: "KEY_NOT_FOUND", code: -1, userInfo: nil)
-  }
+    func decryptDataECIES(tag: String, ciphertext: Data) throws -> FlutterStandardTypedData {
+        // 1) Fetch both the SecKey and its attributes
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassKey,
+            kSecAttrTokenID: kSecAttrTokenIDSecureEnclave,
+            kSecAttrKeyClass: kSecAttrKeyClassPrivate,
+            kSecAttrApplicationTag: tag as CFString,
+            kSecReturnRef: true,
+            kSecReturnAttributes: true,
+        ]
 
-  // 2) See if .userPresence was in the original access control
-  var needsAuth = false
-  if let ac = result[kSecAttrAccessControl as String] as? SecAccessControl,
-     let constraints = SecAccessControlGetConstraints(ac) as? [AnyHashable: Any],
-     constraints[kSecAccessControlUserPresence] != nil
-  {
-    needsAuth = true
-  }
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess,
+            let result = item as? [CFString: Any]
+        else {
+            throw NSError(
+                domain: NSOSStatusErrorDomain,
+                code: Int(status),
+                userInfo: nil)
+        }
 
-  // 3) If we need to authenticate, re-fetch the key with LAContext
-  let keyToUse: SecKey
-  if needsAuth {
-    var authQuery = query
-    authQuery[kSecReturnAttributes as String] = false
-    authQuery[kSecUseAuthenticationContext as String] = LAContext()
+        // 2) Force-cast out your SecKey and SecAccessControl
+        let initialKey = result[kSecValueRef] as! SecKey
+        let accessControl = result[kSecAttrAccessControl] as! SecAccessControl
 
-    var item2: CFTypeRef?
-    guard
-      SecItemCopyMatching(authQuery as CFDictionary, &item2) == errSecSuccess,
-      let authKey = item2 as? SecKey
-    else {
-      throw NSError(domain: "AUTH_FAILED", code: -1, userInfo: nil)
+        // 3) Inspect constraints for userPresence
+        let constraints = SecAccessControlGetConstraints(accessControl)! as! [CFString: Any]
+        let needsAuth = constraints[kSecAccessControlUserPresence] != nil
+
+        // 4) If we need userPresence, re-fetch with an LAContext
+        let keyToUse: SecKey
+        if needsAuth {
+            var authQuery = query
+            authQuery[kSecReturnAttributes] = false  // now only want the ref
+            authQuery[kSecUseAuthenticationContext] = LAContext()
+
+            var item2: CFTypeRef?
+            let s2 = SecItemCopyMatching(authQuery as CFDictionary, &item2)
+            guard s2 == errSecSuccess,
+                let authKey = item2 as? SecKey
+            else {
+                throw NSError(
+                    domain: NSOSStatusErrorDomain,
+                    code: Int(s2),
+                    userInfo: nil)
+            }
+            keyToUse = authKey
+        } else {
+
+            keyToUse = initialKey
+        }
+
+        // 5) Finally decrypt inside the enclave
+        var error: Unmanaged<CFError>?
+        guard
+            let plain = SecKeyCreateDecryptedData(
+                keyToUse,
+                .eciesEncryptionCofactorX963SHA256AESGCM,
+                ciphertext as CFData,
+                &error
+            ) as Data?
+        else {
+            throw error!.takeRetainedValue()
+        }
+
+        return FlutterStandardTypedData(bytes: plain)
     }
-    keyToUse = authKey
-  } else {
-    keyToUse = initialKey
-  }
-
-  // 4) Finally do the decryption with the key that’s been user-authenticated if needed
-  var error: Unmanaged<CFError>?
-  guard
-    let plain = SecKeyCreateDecryptedData(
-      keyToUse,
-      .eciesEncryptionCofactorX963SHA256AESGCM,
-      ciphertext as CFData,
-      &error
-    ) as Data?
-  else {
-    throw error!.takeRetainedValue()
-  }
-  return FlutterStandardTypedData(bytes: plain)
-}
 
     /// Retrieves the enclave private key reference for `tag`, applying user auth if `level == "high"`.
     /// - Parameters:
