@@ -284,7 +284,6 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         guard SecKeyIsAlgorithmSupported(priv, .keyExchange, algorithm) else {
           throw NSError(
             domain: NSOSStatusErrorDomain,
-            code: errSecUnsupportedAlgorithm,
             userInfo:[NSLocalizedDescriptionKey:"Cofactor ECDH not supported"]
           )
         }
