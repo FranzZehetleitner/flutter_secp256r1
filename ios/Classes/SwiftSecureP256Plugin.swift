@@ -289,14 +289,14 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         }
 
         var canDoCofactor = SecKeyIsAlgorithmSupported(
-            privateKey,
+            secKey,
             .keyExchange,
             SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
         )
         print("cofactor-X963-SHA256 supported? \(canDoCofactor)")
 
         canDoCofactor = SecKeyIsAlgorithmSupported(
-            privateKey,
+            secKey,
             .keyExchange,
             SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256
         )
