@@ -13,8 +13,7 @@ class SecureP256Channel extends SecureP256Platform {
   @override
   Future<Uint8List> getPublicKey(String tag,
       {bool requireUserPresence = false}) async {
-    print(requireUserPresence);
-
+    print("hello $requireUserPresence");
     final keyBytes = await methodChannel.invokeMethod(
       Methods.getPublicKey,
       {

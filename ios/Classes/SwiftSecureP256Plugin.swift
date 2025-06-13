@@ -17,7 +17,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             do {
                 let param = call.arguments as? [String: Any]
                 let tag = param!["tag"] as! String
-                let requireUserPresence = (param!["requireUserPresence"] as? Bool) ?? false
+                let requireUserPresence = param!["requireUserPresence"] as! Bool
                 var password: String? = nil
                 if let pwd = param!["password"] as? String {
                     password = pwd
@@ -80,7 +80,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 if let pwd = param!["password"] as? String {
                     password = pwd
                 }
-
+        
                 let sharedSecret = try getSharedSecret(
                     tag: tag, password: password, publicKeyData: publicKeyData)!
                 result(FlutterStandardTypedData(bytes: sharedSecret))
@@ -131,23 +131,25 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         let tagData = tag.data(using: .utf8)
         var flags: SecAccessControlCreateFlags = [.privateKeyUsage]
         var accessError: Unmanaged<CFError>?
+        print("requireUserPresence")
         print(requireUserPresence)
         if requireUserPresence {
             flags.insert(.userPresence)
         }
         let allFlags: [(SecAccessControlCreateFlags, String)] = [
-          (.privateKeyUsage,    "privateKeyUsage"),
-          (.userPresence,       "userPresence"),
-          (.applicationPassword,"applicationPassword"),
-          (.biometryAny,        "biometryAny"),
-          (.biometryCurrentSet, "biometryCurrentSet")
+            (.privateKeyUsage, "privateKeyUsage"),
+            (.userPresence, "userPresence"),
+            (.applicationPassword, "applicationPassword"),
+            (.biometryAny, "biometryAny"),
+            (.biometryCurrentSet, "biometryCurrentSet"),
         ]
 
-let setNames = allFlags
-  .filter { flags.contains($0.0) }
-  .map    { $0.1 }
+        let setNames =
+            allFlags
+            .filter { flags.contains($0.0) }
+            .map { $0.1 }
 
-print("flags: \(setNames.joined(separator: " | "))")
+        print("flags: \(setNames.joined(separator: " | "))")
         let accessControl = SecAccessControlCreateWithFlags(
             kCFAllocatorDefault,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
@@ -167,7 +169,7 @@ print("flags: \(setNames.joined(separator: " | "))")
                 kSecAttrIsPermanent as String: true,
                 kSecAttrApplicationTag as String: tagData,
                 kSecAttrAccessControl as String: accessControl,
-                kSecAttrCanDerive           as String: true
+                kSecAttrCanDerive as String: true,
             ]
             // PUBLIC-key attrs: persistent, tagged
             let publicAttrs: [String: Any] = [
@@ -208,8 +210,11 @@ print("flags: \(setNames.joined(separator: " | "))")
     ) throws -> Data {
         let secKey: SecKey
 
-        if let existing = try? getSecKey(tag: tag, password: password, requireUserPresence: requireUserPresence) {
+        if let existing = try? getSecKey(
+            tag: tag, password: password)
+        {
             secKey = existing
+            print("key existed")
         } else {
             secKey = try generateKeyPair(
                 tag: tag, password: password, requireUserPresence: requireUserPresence)
@@ -289,11 +294,12 @@ print("flags: \(setNames.joined(separator: " | "))")
         let privateKey: SecKey
         let publicKey: SecKey
 
-        let publicAttrs: CFDictionary = [
-          kSecAttrKeyType:           kSecAttrKeyTypeECSECPrimeRandom,
-          kSecAttrKeyClass:          kSecAttrKeyClassPublic,
-          kSecAttrKeySizeInBits:     256
-        ] as CFDictionary
+        let publicAttrs: CFDictionary =
+            [
+                kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+                kSecAttrKeyClass: kSecAttrKeyClassPublic,
+                kSecAttrKeySizeInBits: 256,
+            ] as CFDictionary
 
         var error: Unmanaged<CFError>?
         do {
@@ -316,7 +322,7 @@ print("flags: \(setNames.joined(separator: " | "))")
             SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256
         )
         print("standard-X963-SHA256 supported? \(canDoCofactor)")
-      canDoCofactor = SecKeyIsAlgorithmSupported(
+        canDoCofactor = SecKeyIsAlgorithmSupported(
             publicKey,
             .keyExchange,
             SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
@@ -405,7 +411,8 @@ print("flags: \(setNames.joined(separator: " | "))")
     /// - Parameters:
     ///   - tag: your unique key namespace
     ///   - level: "secure" or "high"
-    internal func getSecKey(tag: String, password: String?, requireUserPresence: Bool = false) throws
+    internal func getSecKey(tag: String, password: String?)
+        throws
         -> SecKey
     {
         let tagData = tag.data(using: .utf8)!
