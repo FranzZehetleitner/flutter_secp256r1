@@ -152,6 +152,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                 kSecAttrIsPermanent as String: true,
                 kSecAttrApplicationTag as String: tagData,
                 kSecAttrAccessControl as String: accessControl,
+                kSecAttrCanDerive           as String: true
             ]
             // PUBLIC-key attrs: persistent, tagged
             let publicAttrs: [String: Any] = [
@@ -317,7 +318,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         let sharedSecretData =
             SecKeyCopyKeyExchangeResult(
                 privateKey,
-                SecKeyAlgorithm.ecdhKeyExchangeStandard,
+                SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256,
                 publicKey,
                 [:] as CFDictionary,
                 &error
