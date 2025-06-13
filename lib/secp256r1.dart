@@ -45,6 +45,8 @@ class SecureP256 {
   static Future<Uint8List> getSharedSecret(String tag, EcPublicKey publicKey) {
     assert(tag.isNotEmpty);
     Uint8List rawKey = encodeEcPublicKeyX963(publicKey);
+    print(rawKey);
+    print(rawKey.length);
     return SecureP256Platform.instance.getSharedSecret(tag, rawKey);
   }
 
