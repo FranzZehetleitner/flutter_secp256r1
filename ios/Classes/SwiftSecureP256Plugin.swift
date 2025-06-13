@@ -276,6 +276,8 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             [
                 kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
                 kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+                kSecAttrKeySizeInBits as String: 256,
+
             ] as CFDictionary
 
         var error: Unmanaged<CFError>?
