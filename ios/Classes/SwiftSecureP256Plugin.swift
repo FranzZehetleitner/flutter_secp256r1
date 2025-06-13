@@ -133,6 +133,19 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         if requireUserPresence {
             flags.insert(.userPresence)
         }
+let allFlags: [(SecAccessControlCreateFlags, String)] = [
+  (.privateKeyUsage,    "privateKeyUsage"),
+  (.userPresence,       "userPresence"),
+  (.applicationPassword,"applicationPassword"),
+  (.biometryAny,        "biometryAny"),
+  (.biometryCurrentSet, "biometryCurrentSet")
+]
+
+let setNames = allFlags
+  .filter { flags.contains($0.0) }
+  .map    { $0.1 }
+
+print("flags: \(setNames.joined(separator: " | "))")
         let accessControl = SecAccessControlCreateWithFlags(
             kCFAllocatorDefault,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
