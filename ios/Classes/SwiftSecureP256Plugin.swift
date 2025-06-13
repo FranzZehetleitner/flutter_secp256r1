@@ -270,38 +270,37 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
     }
 
     func getSharedSecret(tag: String, password: String?, publicKeyData: Data) throws -> Data? {
-        let secKey: SecKey
+        let privateKey: SecKey
         let publicKey: SecKey
-        let publicKeyAttributes =
-            [
-                kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-                kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
-                kSecAttrKeySizeInBits as String: 256,
 
-            ] as CFDictionary
+        let publicAttrs: CFDictionary = [
+          kSecAttrKeyType:           kSecAttrKeyTypeECSECPrimeRandom,
+          kSecAttrKeyClass:          kSecAttrKeyClassPublic,
+          kSecAttrKeySizeInBits:     256
+        ] as CFDictionary
 
         var error: Unmanaged<CFError>?
         do {
-            secKey = try getSecKey(tag: tag, password: password)
-            publicKey = SecKeyCreateWithData(publicKeyData as CFData, publicKeyAttributes, &error)!
+            privateKey = try getSecKey(tag: tag, password: password)
+            publicKey = SecKeyCreateWithData(publicKeyData as CFData, publicAttrs, &error)!
         } catch {
             throw error
         }
 
         var canDoCofactor = SecKeyIsAlgorithmSupported(
-            secKey,
+            privateKey,
             .keyExchange,
             SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
         )
         print("cofactor-X963-SHA256 supported? \(canDoCofactor)")
 
         canDoCofactor = SecKeyIsAlgorithmSupported(
-            secKey,
+            privateKey,
             .keyExchange,
             SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256
         )
         print("standard-X963-SHA256 supported? \(canDoCofactor)")
-        var canDoCofactor = SecKeyIsAlgorithmSupported(
+      canDoCofactor = SecKeyIsAlgorithmSupported(
             publicKey,
             .keyExchange,
             SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
@@ -317,7 +316,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
 
         let sharedSecretData =
             SecKeyCopyKeyExchangeResult(
-                secKey,
+                privateKey,
                 SecKeyAlgorithm.ecdhKeyExchangeStandard,
                 publicKey,
                 [:] as CFDictionary,
