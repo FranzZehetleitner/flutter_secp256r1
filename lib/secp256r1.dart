@@ -10,7 +10,6 @@ class SecureP256 {
 
   static Future<EcPublicKey> getPublicKey(String tag,
       {bool requireUserPresence = false}) async {
-    print(requireUserPresence);
     assert(tag.isNotEmpty);
     final raw = await SecureP256Platform.instance
         .getPublicKey(tag, requireUserPresence: requireUserPresence);
@@ -26,11 +25,9 @@ class SecureP256 {
     return signature;
   }
 
-  static Future<bool> verify(
-    Uint8List payload,
-    EcPublicKey publicKey,
-    Uint8List signature,
-  ) {
+  static Future<bool> verify(Uint8List payload,
+      EcPublicKey publicKey,
+      Uint8List signature,) {
     assert(payload.isNotEmpty);
     assert(signature.isNotEmpty);
     Uint8List rawKey = encodeEcPublicKeyX963(publicKey);
@@ -45,8 +42,7 @@ class SecureP256 {
   static Future<Uint8List> getSharedSecret(String tag, EcPublicKey publicKey) {
     assert(tag.isNotEmpty);
     Uint8List rawKey = encodeEcPublicKeyX963(publicKey);
-    print(rawKey);
-    print(rawKey.length);
+
     return SecureP256Platform.instance.getSharedSecret(tag, rawKey);
   }
 
