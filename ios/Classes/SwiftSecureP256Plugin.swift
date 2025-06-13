@@ -288,6 +288,33 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
             throw error
         }
 
+        var canDoCofactor = SecKeyIsAlgorithmSupported(
+            privateKey,
+            .keyExchange,
+            SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
+        )
+        print("cofactor-X963-SHA256 supported? \(canDoCofactor)")
+
+        canDoCofactor = SecKeyIsAlgorithmSupported(
+            privateKey,
+            .keyExchange,
+            SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256
+        )
+        print("standard-X963-SHA256 supported? \(canDoCofactor)")
+        var canDoCofactor = SecKeyIsAlgorithmSupported(
+            publicKey,
+            .keyExchange,
+            SecKeyAlgorithm.ecdhKeyExchangeCofactorX963SHA256
+        )
+        print("cofactor-X963-SHA256 supported? \(canDoCofactor)")
+
+        canDoCofactor = SecKeyIsAlgorithmSupported(
+            publicKey,
+            .keyExchange,
+            SecKeyAlgorithm.ecdhKeyExchangeStandardX963SHA256
+        )
+        print("standard-X963-SHA256 supported? \(canDoCofactor)")
+
         let sharedSecretData =
             SecKeyCopyKeyExchangeResult(
                 secKey,
