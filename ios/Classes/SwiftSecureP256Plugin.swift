@@ -71,7 +71,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                     FlutterError(
                         code: "verify", message: error.localizedDescription, details: "\(error)"))
             }
-        case "getSharedSecret":
+        /*case "getSharedSecret":
             do {
                 let param = call.arguments as? [String: Any]
                 let tag = param!["tag"] as! String
@@ -90,6 +90,7 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
                         code: "getSharedSecret", message: error.localizedDescription,
                         details: "\(error)"))
             }
+         */
         case "encryptData":
             do {
                 let param = call.arguments as? [String: Any]
@@ -130,16 +131,17 @@ public class SwiftSecureP256Plugin: NSObject, FlutterPlugin {
         let tagData = tag.data(using: .utf8)
         var flags: SecAccessControlCreateFlags = [.privateKeyUsage]
         var accessError: Unmanaged<CFError>?
+        print(requireUserPresence)
         if requireUserPresence {
             flags.insert(.userPresence)
         }
-let allFlags: [(SecAccessControlCreateFlags, String)] = [
-  (.privateKeyUsage,    "privateKeyUsage"),
-  (.userPresence,       "userPresence"),
-  (.applicationPassword,"applicationPassword"),
-  (.biometryAny,        "biometryAny"),
-  (.biometryCurrentSet, "biometryCurrentSet")
-]
+        let allFlags: [(SecAccessControlCreateFlags, String)] = [
+          (.privateKeyUsage,    "privateKeyUsage"),
+          (.userPresence,       "userPresence"),
+          (.applicationPassword,"applicationPassword"),
+          (.biometryAny,        "biometryAny"),
+          (.biometryCurrentSet, "biometryCurrentSet")
+        ]
 
 let setNames = allFlags
   .filter { flags.contains($0.0) }
