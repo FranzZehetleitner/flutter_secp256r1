@@ -10,6 +10,7 @@ class SecureP256 {
 
   static Future<EcPublicKey> getPublicKey(String tag,
       {bool requireUserPresence = false}) async {
+    print(requireUserPresence);
     assert(tag.isNotEmpty);
     final raw = await SecureP256Platform.instance
         .getPublicKey(tag, requireUserPresence: requireUserPresence);
